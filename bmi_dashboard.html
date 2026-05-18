@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BMI & Health Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Instrument+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f2f0eb;
+      --card: #ffffff;
+      --border: #e2dfd7;
+      --text: #18181b;
+      --muted: #71717a;
+      --underweight: #3b82f6;
+      --normal:      #22c55e;
+      --overweight:  #f59e0b;
+      --obese:       #ef4444;
+      --radius: 20px;
+      --active: #18181b;
+    }
+
+    body {
+      font-family: 'Instrument Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 40px 16px 80px;
+    }
+
+    /* ── Page header ── */
+    .page-header {
+      max-width: 760px;
+      margin: 0 auto 40px;
+    }
+    .page-header h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -1px;
+    }
+    .page-header h1 span { color: var(--muted); font-weight: 400; }
+    .page-header p {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 0.95rem;
+      font-weight: 300;
+    }
+
+    /* ── Layout grid ── */
+    .grid {
+      max-width: 760px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+    }
+
+    .card.full { grid-column: 1 / -1; }
+
+    /* ── Input card ── */
+    .card-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+
+    .input-group { margin-bottom: 18px; }
+    .input-group label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .input-row { display: flex; gap: 10px; }
+    .input-group input,
+    .input-group select {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      font-family: 'Instrument Sans', sans-serif;
+      font-size: 1rem;
+      background: var(--bg);
+      color: var(--text);
+      outline: none;
+      transition: border-color .2s;
+    }
+    .input-group input:focus,
+    .input-group select:focus { border-color: var(--text); }
+
+    .btn {
+      width: 100%;
+      padding: 14px;
+      background: var(--text);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      font-family: 'Syne', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.03em;
+      transition: opacity .2s, transform .1s;
+      margin-top: 4px;
+    }
+    .btn:hover  { opacity: 0.85; }
+    .btn:active { transform: scale(0.98); }
+
+    /* ── BMI result card ── */
+    .bmi-number {
+      font-family: 'Syne', sans-serif;
+      font-size: 4.5rem;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -2px;
+      transition: color .4s;
+    }
+    .bmi-category {
+      font-size: 1rem;
+      font-weight: 500;
+      margin-top: 6px;
+      transition: color .4s;
+    }
+    .bmi-placeholder { color: var(--border); }
+
+    /* ── BMI scale bar ── */
+    .scale-wrap { margin-top: 24px; }
+    .scale-label-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.65rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 8px;
+    }
+    .scale-bar {
+      height: 10px;
+      border-radius: 99px;
+      background: linear-gradient(to right,
+        var(--underweight) 0% 22%,
+        var(--normal)      22% 44%,
+        var(--overweight)  44% 66%,
+        var(--obese)       66% 100%
+      );
+      position: relative;
+    }
+    .scale-marker {
+      position: absolute;
+      top: -4px;
+      width: 18px;
+      height: 18px;
+      background: var(--text);
+      border: 3px solid #fff;
+      border-radius: 50%;
+      transform: translateX(-50%);
+      transition: left .6s cubic-bezier(.34,1.56,.64,1);
+      display: none;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+
+    /* ── Stats row ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 0;
+    }
+    .stat-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 14px;
+      text-align: center;
+    }
+    .stat-box .s-label {
+      font-size: 0.68rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .stat-box .s-val {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+    .stat-placeholder { color: var(--border); }
+
+    /* ── Chart card ── */
+    .chart-wrap { position: relative; height: 200px; }
+
+    /* ── Tips card ── */
+    .tips-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .tips-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 0.88rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .tip-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+      flex-shrink: 0;
+      margin-top: 5px;
+      transition: background .4s;
+    }
+    .tip-text { transition: color .3s; }
+
+    /* ── Hidden until calculated ── */
+    .hidden { opacity: 0; pointer-events: none; }
+    .revealed { opacity: 1; pointer-events: auto; transition: opacity .5s ease; }
+
+    /* ── Error ── */
+    .error-msg {
+      color: var(--obese);
+      font-size: 0.82rem;
+      margin-top: 10px;
+      min-height: 18px;
+      font-weight: 500;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 560px) {
+      .grid { grid-template-columns: 1fr; }
+      .card.full { grid-column: 1; }
+      .stats-grid { grid-template-columns: repeat(3,1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>BMI & Health <span>Dashboard</span></h1>
+  <p>Enter your details to get your Body Mass Index, health stats, and personalised tips.</p>
+</div>
+
+<div class="grid">
+
+  <!-- ── Input card ── -->
+  <div class="card">
+    <div class="card-title">Your Details</div>
+
+    <div class="input-group">
+      <label>Age</label>
+      <input id="age" type="number" placeholder="e.g. 21" min="1" max="120"/>
+    </div>
+
+    <div class="input-group">
+      <label>Gender</label>
+      <select id="gender">
+        <option value="">Select gender</option>
+        <option value="male">Male</option>
+        <option value="female">Female</option>
+        <option value="other">Other / Prefer not to say</option>
+      </select>
+    </div>
+
+    <div class="input-group">
+      <label>Height</label>
+      <div class="input-row">
+        <input id="heightCm" type="number" placeholder="cm  e.g. 170" min="50" max="250"/>
+      </div>
+    </div>
+
+    <div class="input-group">
+      <label>Weight (kg)</label>
+      <input id="weight" type="number" placeholder="e.g. 65" min="1" max="300"/>
+    </div>
+
+    <button class="btn" onclick="calculate()">Calculate BMI</button>
+    <div class="error-msg" id="errorMsg"></div>
+  </div>
+
+  <!-- ── BMI result card ── -->
+  <div class="card" id="bmiCard">
+    <div class="card-title">Your BMI</div>
+    <div class="bmi-number bmi-placeholder" id="bmiNumber">—</div>
+    <div class="bmi-category bmi-placeholder" id="bmiCategory">Fill in your details</div>
+
+    <div class="scale-wrap">
+      <div class="scale-label-row">
+        <span>Underweight</span>
+        <span>Normal</span>
+        <span>Overweight</span>
+        <span>Obese</span>
+      </div>
+      <div class="scale-bar">
+        <div class="scale-marker" id="scaleMarker"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Stats card ── -->
+  <div class="card full hidden" id="statsCard">
+    <div class="card-title">Health Stats</div>
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="s-label">Ideal Weight</div>
+        <div class="s-val" id="idealWeight"><span class="stat-placeholder">—</span></div>
+      </div>
+      <div class="stat-box">
+        <div class="s-label">Weight to Lose/Gain</div>
+        <div class="s-val" id="weightDiff"><span class="stat-placeholder">—</span></div>
+      </div>
+      <div class="stat-box">
+        <div class="s-label">Daily Calories</div>
+        <div class="s-val" id="calories"><span class="stat-placeholder">—</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Chart card ── -->
+  <div class="card hidden" id="chartCard">
+    <div class="card-title">BMI Scale Breakdown</div>
+    <div class="chart-wrap">
+      <canvas id="bmiChart"></canvas>
+    </div>
+  </div>
+
+  <!-- ── Tips card ── -->
+  <div class="card hidden" id="tipsCard">
+    <div class="card-title">Health Tips</div>
+    <ul class="tips-list" id="tipsList"></ul>
+  </div>
+
+</div>
+
+<script>
+  let chartInstance = null;
+
+  const TIPS = {
+    underweight: [
+      "Eat calorie-dense whole foods like nuts, seeds, and avocados.",
+      "Include protein-rich meals — eggs, lentils, chicken, paneer.",
+      "Aim for 3 main meals + 2 snacks daily.",
+      "Light strength training helps build healthy muscle mass.",
+      "Consult a doctor if you have trouble gaining weight.",
+    ],
+    normal: [
+      "Great work! Maintain this with regular physical activity.",
+      "Aim for 150 min of moderate exercise per week.",
+      "Keep hydrated — at least 2–3 litres of water daily.",
+      "Eat a balanced mix of proteins, carbs, and healthy fats.",
+      "Get 7–8 hours of quality sleep every night.",
+    ],
+    overweight: [
+      "Aim for a modest calorie deficit of 300–500 kcal/day.",
+      "Replace sugary drinks with water, chaas, or green tea.",
+      "Add 30 min of brisk walking or cycling each day.",
+      "Fill half your plate with vegetables at every meal.",
+      "Limit processed foods, fried snacks, and refined sugar.",
+    ],
+    obese: [
+      "Consult a doctor or dietitian for a personalised plan.",
+      "Start with low-impact exercise like walking or swimming.",
+      "Keep a food diary to track your eating habits.",
+      "Focus on sustainable lifestyle changes, not crash diets.",
+      "Small steps count — even a 5–10% weight loss helps.",
+    ],
+  };
+
+  function getCategory(bmi) {
+    if (bmi < 18.5) return { key: 'underweight', label: 'Underweight', color: '#3b82f6' };
+    if (bmi < 25)   return { key: 'normal',      label: 'Normal Weight', color: '#22c55e' };
+    if (bmi < 30)   return { key: 'overweight',  label: 'Overweight',   color: '#f59e0b' };
+                    return { key: 'obese',        label: 'Obese',        color: '#ef4444' };
+  }
+
+  // Map BMI (10–40+) to % position on scale bar
+  function bmiToPercent(bmi) {
+    const min = 10, max = 40;
+    return Math.min(Math.max(((bmi - min) / (max - min)) * 100, 2), 97);
+  }
+
+  function calculate() {
+    const age    = parseFloat(document.getElementById('age').value);
+    const gender = document.getElementById('gender').value;
+    const height = parseFloat(document.getElementById('heightCm').value);
+    const weight = parseFloat(document.getElementById('weight').value);
+    const errEl  = document.getElementById('errorMsg');
+
+    errEl.textContent = '';
+
+    if (!age || !gender || !height || !weight) {
+      errEl.textContent = 'Please fill in all fields.'; return;
+    }
+    if (age < 2 || age > 120)      { errEl.textContent = 'Enter a valid age (2–120).'; return; }
+    if (height < 50 || height > 250){ errEl.textContent = 'Enter a valid height (50–250 cm).'; return; }
+    if (weight < 10 || weight > 300){ errEl.textContent = 'Enter a valid weight (10–300 kg).'; return; }
+
+    const hm  = height / 100;
+    const bmi = weight / (hm * hm);
+    const cat = getCategory(bmi);
+
+    // ── BMI display ──
+    const bmiEl = document.getElementById('bmiNumber');
+    const catEl = document.getElementById('bmiCategory');
+    bmiEl.textContent  = bmi.toFixed(1);
+    bmiEl.style.color  = cat.color;
+    bmiEl.classList.remove('bmi-placeholder');
+    catEl.textContent  = cat.label;
+    catEl.style.color  = cat.color;
+    catEl.classList.remove('bmi-placeholder');
+
+    // ── Scale marker ──
+    const marker = document.getElementById('scaleMarker');
+    marker.style.display = 'block';
+    marker.style.left    = bmiToPercent(bmi) + '%';
+
+    // ── Ideal weight (Devine formula) ──
+    let idealMin, idealMax;
+    const heightInch = height / 2.54;
+    const extra = Math.max(0, heightInch - 60);
+    if (gender === 'female') {
+      const base = 45.5 + 2.3 * extra;
+      idealMin = (base * 0.9).toFixed(1);
+      idealMax = (base * 1.1).toFixed(1);
+    } else {
+      const base = 50 + 2.3 * extra;
+      idealMin = (base * 0.9).toFixed(1);
+      idealMax = (base * 1.1).toFixed(1);
+    }
+    document.getElementById('idealWeight').textContent = `${idealMin}–${idealMax} kg`;
+
+    // ── Weight diff ──
+    const midIdeal = ((parseFloat(idealMin) + parseFloat(idealMax)) / 2);
+    const diff = weight - midIdeal;
+    const diffEl = document.getElementById('weightDiff');
+    if (Math.abs(diff) < 1) {
+      diffEl.textContent = 'On target!';
+      diffEl.style.color = '#22c55e';
+    } else if (diff > 0) {
+      diffEl.textContent = `−${diff.toFixed(1)} kg`;
+      diffEl.style.color = '#f59e0b';
+    } else {
+      diffEl.textContent = `+${Math.abs(diff).toFixed(1)} kg`;
+      diffEl.style.color = '#3b82f6';
+    }
+
+    // ── BMR → daily calories (Harris-Benedict) ──
+    let bmr;
+    if (gender === 'female') {
+      bmr = 447.6 + (9.25 * weight) + (3.1 * height) - (4.33 * age);
+    } else {
+      bmr = 88.36 + (13.4 * weight) + (4.8 * height) - (5.68 * age);
+    }
+    const tdee = Math.round(bmr * 1.375); // lightly active
+    document.getElementById('calories').textContent = `${tdee} kcal`;
+
+    // ── Reveal stat/chart/tips cards ──
+    ['statsCard', 'chartCard', 'tipsCard'].forEach(id => {
+      const el = document.getElementById(id);
+      el.classList.remove('hidden');
+      el.classList.add('revealed');
+    });
+
+    // ── Chart ──
+    if (chartInstance) chartInstance.destroy();
+    chartInstance = new Chart(document.getElementById('bmiChart'), {
+      type: 'bar',
+      data: {
+        labels: ['Underweight\n< 18.5', 'Normal\n18.5–24.9', 'Overweight\n25–29.9', 'Obese\n≥ 30'],
+        datasets: [{
+          label: 'BMI Range Width',
+          data: [8.5, 6.4, 5, 10],
+          backgroundColor: [
+            cat.key === 'underweight' ? '#3b82f6' : '#dbeafe',
+            cat.key === 'normal'      ? '#22c55e' : '#dcfce7',
+            cat.key === 'overweight'  ? '#f59e0b' : '#fef9c3',
+            cat.key === 'obese'       ? '#ef4444' : '#fee2e2',
+          ],
+          borderRadius: 10,
+          borderSkipped: false,
+        }, {
+          label: 'Your BMI',
+          data: [
+            cat.key === 'underweight' ? bmi : null,
+            cat.key === 'normal'      ? bmi : null,
+            cat.key === 'overweight'  ? bmi : null,
+            cat.key === 'obese'       ? bmi : null,
+          ],
+          backgroundColor: cat.color,
+          borderRadius: 10,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => ctx.datasetIndex === 1 ? ` Your BMI: ${bmi.toFixed(1)}` : ` Range: ${ctx.parsed.y.toFixed(1)}`
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { font: { family: 'Instrument Sans', size: 11 }, color: '#71717a' }
+          },
+          y: {
+            grid: { color: '#f2f0eb' },
+            ticks: { font: { family: 'Instrument Sans', size: 11 }, color: '#71717a' },
+            title: { display: true, text: 'BMI Value', color: '#71717a', font: { size: 11 } }
+          }
+        }
+      }
+    });
+
+    // ── Tips ──
+    const list = document.getElementById('tipsList');
+    list.innerHTML = '';
+    TIPS[cat.key].forEach(tip => {
+      list.innerHTML += `
+        <li>
+          <span class="tip-dot" style="background:${cat.color}"></span>
+          <span class="tip-text">${tip}</span>
+        </li>`;
+    });
+  }
+
+  // Enter key support
+  document.querySelectorAll('input, select').forEach(el => {
+    el.addEventListener('keydown', e => { if (e.key === 'Enter') calculate(); });
+  });
+</script>
+</body>
+</html>
